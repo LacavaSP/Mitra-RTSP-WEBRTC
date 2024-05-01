@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body> 
+    <div id="canvas-container">
+        <canvas id="canvas" width="640" height="480"></canvas>
+      </div>
+    
+      <script>
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+    
+        const ws = new WebSocket('ws://192.168.0.10:5661');
+    
+        ws.onmessage = function(event) {
+          const base64Frame = event.data;
+          const image = new Image();
+          image.onload = function() {
+            // Limpa o canvas e desenha a imagem
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          };
+          image.src = 'data:image/jpeg;base64,' + base64Frame;
+        };
+      </script>
+</body>
+</html>

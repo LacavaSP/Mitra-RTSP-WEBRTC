@@ -1,0 +1,23 @@
+{
+  "name": "monitoramento",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "child_process": "^1.0.2",
+    "express": "^4.19.2",
+    "node-rtsp-stream-es6": "^1.0.7",
+    "node-webcam": "^0.8.2",
+    "nodemon": "^3.1.0",
+    "simple-peer": "^9.11.1",
+    "socket.io-client": "^4.7.5",
+    "wrtc": "^0.4.7",
+    "ws": "^8.17.0"
+  }
+}

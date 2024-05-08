@@ -33,21 +33,22 @@ class WebRTCGatewayService {
             const clientChannel = connectionData.channel
             const type = connectionData.type
         
-            if (!connectionData.type || !connectionData.channel) {
+            if (!connectionData.type || !connectionData.channel || (connectionData?.type !== 'streamer' && !connectionData.streamId)) {
                 socket.disconnect()
             }
         
-            if (!(await this.channelService.verifyIfChannelExists(clientChannel))) {
+           /* if (!(await this.channelService.verifyIfChannelExists(clientChannel))) {
                 console.log('Channel does not exist')
                 socket.disconnect()
-            }
+            }*/
         
             console.log(`Client ${socket.id} entering ${clientChannel} as a ${type}`)
             socket.join(clientChannel)
          
             socket.to(clientChannel).emit(CALL_EVENT, {
                 id: socket.id,
-                type: type
+                type: type,
+                data: connectionData
             })
          
             socket.on(OFFER_EVENT, (data) => {

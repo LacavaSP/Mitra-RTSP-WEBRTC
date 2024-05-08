@@ -21,7 +21,7 @@ expressServer.use((req, res, next) => {
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Permitir cabeçalhos específicos
     next();
 });
-
+expressServer.use(express.static('public'))
 const backendServer = nodeJsHttpModule.createServer(expressServer)
 
 class WebRTCServerApp {

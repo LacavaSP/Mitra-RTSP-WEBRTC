@@ -1,63 +1,74 @@
 const { spawn } = require('child_process');
 const WebSocket = require('ws');
 const express = require('express')
+const fs = require('fs')
+const path = require('path')
 const wss = new WebSocket.Server({ port: 5661 });
 const porta = 3030
 const peers = new Map()
-
+const offStreamImage = fs.readFileSync(path.join(__dirname, '/assets/offstream.jpg'))
 wss.on('connection', (client) => {
     console.log('Novo cliente conectado!')
    // wsClients.push(client)
     client.send('Olá')
 })
- 
-const url1 = 'rtsp://admin:JPJQMT@192.168.0.26/1'
+  
+
+let urls = []
+let stoppedStreams = []
 // Comando ffmpeg para capturar os quadros e convertê-los em base64
-const ffmpegCommand = [
-    '-i', url1,
-    '-vf', 'fps=20,scale=640:-1', // Reduz a taxa de quadros e a resolução (largura 640px, altura mantida proporcionalmente)
-    '-f', 'image2pipe',
-    '-c:v', 'mjpeg', // Codec de vídeo JPEG (MJPEG) 
-    '-'
-];
+ 
 
 let isStreaming = false
-  
-function getFrame() {
-  const ffmpeg = spawn('ffmpeg', ffmpegCommand);
 
-  // Lendo a saída de erro do ffmpeg
-  ffmpeg.stderr.on('data', (data) => {
-    //console.error(`Erro do ffmpeg: ${data}`);
-  });
 
+function buildFfmpegCommand(url) {
+    return [
+        '-i', url,
+        '-vf', 'fps=15,scale=640:-1', // Reduz a taxa de quadros e a resolução (largura 640px, altura mantida proporcionalmente)
+        '-f', 'image2pipe',
+        '-c:v', 'mjpeg',
+        '-timeout', '5',  // Codec de vídeo JPEG (MJPEG) 
+        '-'
+    ];
+}
+
+function startStream(streamData) {
+  const command =  buildFfmpegCommand(streamData.link)
+  const ffmpeg = spawn('ffmpeg', command);
+ 
+ 
   // Capturando a saída do ffmpeg (quadro)
   ffmpeg.stdout.on('data', (data) => {
     // Convertendo o quadro em base64
-    const base64Frame = Buffer.from(data);
- 
-    isStreaming = true
+    const base64Frame = Buffer.from(data); 
+    isStreaming = true 
     if (peers?.size > 0) {
         for (const client of peers.values()) {
            
             if (client?._channel?.readyState) {
-                client.send(base64Frame)
+                
+                if (!client.invalidStrId && streamData.id === client.appData.streamId) {
+                    client.send(base64Frame) 
+                }
+
             }
          
         }
     }
     
   });
+ 
 
   // Lidando com o término do processo ffmpeg
   ffmpeg.on('close', (code) => {
+    console.log(command)
     console.log(`Processo ffmpeg encerrado com código ${code}`); 
-    isStreaming = false
+    isStreaming = false 
   });
-}
- 
-getFrame();
 
+  return ffmpeg
+} 
 
 const servidorHttp = express()
 
@@ -74,6 +85,7 @@ const {
   CANDIDATE_EVENT,
   ANSWER_EVENT
 } = require('./shared/SocketEventsNames')
+
 const socket = io('http://localhost:6060', {
     query: {
         dados: JSON.stringify({
@@ -95,8 +107,9 @@ socket.on('disconnect', () => {
 
 const SimplePeer = require('simple-peer');
 const wrtc = require('wrtc')
+
 // Função para criar um par
-function genPeer(id) {
+function genPeer(id, peerData) {
     const peer = new SimplePeer({
         initiator: true, // Define o par como o iniciador da conexão
         trickle: false, // Desativa o trickle ICE
@@ -143,20 +156,41 @@ function genPeer(id) {
   
    
     peer.on('connect', () => {
-        console.log('Conexão estabelecida!');
+        console.log('Conexão estabelecida! ');
         // Agora você pode começar a enviar e receber dados
+        peer.appData = peerData
         peers.set(id, peer)
     
     });
  
     peer.on('data', (data) => {
-        console.log('Dados recebidos:', data.toString());
+        console.log('Dados recebidos:', data);
+        const mensagem = JSON.parse(data)
+        console.log(mensagem)
+
+        if (mensagem.type === 'streamChange') {
+                const obj = peers.get(id)
+            console.log(stoppedStreams)
+            if (urls.find((v) => v.id === mensagem.streamId)) {
+                console.log('valido')
+                obj.invalidStrId = false
+                obj.appData.streamId = mensagem.streamId
+            } else {
+                console.log('invalido')
+                obj.invalidStrId = true
+                console.log(obj.appData)
+                console.log(offStreamImage)
+                obj.send(offStreamImage)
+            }
+         
+        }
+
     });
  
     peer.on('error', (err) => {
         console.error('Erro:', err);
     });
- 
+  
 
     return peer;
 }
@@ -164,12 +198,31 @@ function genPeer(id) {
 // Evento 'call': é acionado quando um evento 'call' é recebido do servidor
 socket.on('call', (data) => {
     const tipo = data?.type;
+    const peerData = data.data
     const id = data?.id;
     if (tipo && tipo === 'listener') {
         console.log('Chamado aceito:', data);
         if (id) {
-            const peer = genPeer(id); 
-
+            const peer = genPeer(id, peerData); 
         }
     }
 });
+
+
+function configureVideoStreaming() {
+    let data = [ ]
+
+    urls = data
+
+    for (const streamData of urls) {
+        try {
+            startStream(streamData)
+        } catch (e) {
+            console.log(e)
+        }
+    
+    }
+}
+
+configureVideoStreaming()
+ 
